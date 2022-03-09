@@ -1,6 +1,7 @@
-package app
+package test
 
 import (
+	"KWayMerger/app"
 	"bufio"
 	"errors"
 	"fmt"
@@ -133,21 +134,9 @@ func TestApp(t *testing.T) {
 				}()
 			}
 			wg.Wait()
-			var wg2 sync.WaitGroup
-			// start reading and sorting
-			wg2.Add(inputFilesCount)
-			for i := 0; i < inputFilesCount; i++ {
-				j := i
-				// Sort and rewrite integers in files, one goroutine for one file
-				go func() {
-					defer wg2.Done()
-					readSortRewrite(inputFiles[j])
-				}()
-			}
-			wg2.Wait()
-			// merge and output
 			outputFile := outputDir + "/" + tt.name + "out.txt"
-			mergeAndWrite(inputFiles, outputFile)
+			app.Run(inputFiles, outputFile)
+			// verify the output
 			if got := verify(outputFile); got != tt.want {
 				t.Errorf("Are numbers in the output file sorted? %v, want %v", got, tt.want)
 			}

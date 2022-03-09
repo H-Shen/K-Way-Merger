@@ -1,10 +1,10 @@
 package main
 
 import (
+	"KWayMerger/app"
 	"fmt"
 	"log"
 	"os"
-	"untitled/app"
 )
 
 func showUsage() {
@@ -21,13 +21,4 @@ func main() {
 		os.Exit(1)
 	}
 	app.Run(os.Args[1:(len(os.Args)-1)], os.Args[len(os.Args)-1])
-}
-
-type ListNode struct {
-	Val  int
-	Next *ListNode
-}
-
-func deleteDuplicates(head *ListNode) *ListNode {
-	return nil
 }

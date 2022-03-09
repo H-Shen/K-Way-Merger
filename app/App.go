@@ -1,9 +1,9 @@
 package app
 
 import (
+	heap2 "KWayMerger/heap"
 	"bufio"
 	"container/heap"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -59,60 +59,36 @@ func readSortRewrite(file string) {
 	}
 }
 
-func NewNode(filename string) (Node, error) {
-	fd, err := os.Open(filename)
-	if err != nil {
-		return Node{}, err
-	}
-	scanner := bufio.NewScanner(fd)
-	scanner.Split(bufio.ScanWords)
-	if scanner.Scan() {
-		val, err := strconv.Atoi(scanner.Text())
-		if err != nil {
-			return Node{}, err
-		}
-		return Node{
-			val:     val,
-			fd:      fd,
-			scanner: scanner,
-		}, nil
-	}
-	if err = scanner.Err(); err != nil {
-		return Node{}, err
-	}
-	return Node{}, errors.New("failed to scan the first integer")
-}
-
 // Merge all numbers in all files and output to 'filename'
 func mergeAndWrite(input []string, output string) {
 	fd, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	var minHeap MinHeap
+	var minHeap heap2.MinHeap
 	heap.Init(&minHeap)
 	for i := 0; i < len(input); i++ {
-		node, err := NewNode(input[i])
+		node, err := heap2.NewNode(input[i])
 		if err == nil {
 			heap.Push(&minHeap, node)
 		}
 	}
 	for !minHeap.Empty() {
-		node := heap.Pop(&minHeap).(Node)
+		node := heap.Pop(&minHeap).(heap2.Node)
 		// write the val to the output file
-		_, err = fmt.Fprintf(fd, "%v\n", node.val)
+		_, err = fmt.Fprintf(fd, "%v\n", node.Val)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if node.scanner.Scan() {
-			val, err := strconv.Atoi(node.scanner.Text())
+		if node.Scanner.Scan() {
+			val, err := strconv.Atoi(node.Scanner.Text())
 			if err != nil {
 				log.Fatalln(err)
 			}
-			node.val = val
+			node.Val = val
 			heap.Push(&minHeap, node)
 		} else {
-			err := node.fd.Close()
+			err := node.Fd.Close()
 			if err != nil {
 				log.Fatalln(err)
 			}
