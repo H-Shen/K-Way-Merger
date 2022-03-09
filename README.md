@@ -3,7 +3,7 @@
 A toy implementation of K-way Merger in Go. The app: 
 
 * Receives a list of input files and an output file
-* Sort integers in each input file by increasing order and rewrite the result to the input file
+* Sort integers in each input file by increasing order and rewriting the result to the input file
 * Merge all integers in all input files and write the result to the output file using a binary heap.
 
 #### Usage
