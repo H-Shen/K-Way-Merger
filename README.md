@@ -6,6 +6,8 @@ A toy implementation of K-way Merger in Go. The app:
 * Sort integers in each input file by increasing order and rewriting the result to the input file
 * Merge all integers in all input files and write the result to the output file using a binary heap.
 
+A possible application scenario: Sorting billions of integers after splitting them into multiple files.
+
 #### Usage
 
 To build the image and execute the unit tests in a docker container, run:
