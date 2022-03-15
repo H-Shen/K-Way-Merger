@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	NUMBER = 100000
+	NUMBER = 1000000
 )
 
 func generateRandomNumber(filename string, n int) {
