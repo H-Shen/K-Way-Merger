@@ -26,3 +26,4 @@ docker run --name kwaymerger-container01 kwaymerger-image01
 * [Direct k-way merge by heap](https://en.wikipedia.org/wiki/K-way_merge_algorithm#Heap)
 * [Merge k Sorted Lists](https://leetcode.com/problems/merge-k-sorted-lists)
 * [Kth Smallest Element in a Sorted Matrix](https://leetcode.com/problems/kth-smallest-element-in-a-sorted-matrix)
+* [External merge sort](https://en.wikipedia.org/wiki/External_sorting)
