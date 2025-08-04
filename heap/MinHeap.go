@@ -2,68 +2,88 @@ package heap
 
 import (
 	"bufio"
-	"errors"
+	"fmt"
 	"os"
 	"strconv"
 )
 
-// Node File node
+// Node holds the current integer value read from a file,
+// along with the file descriptor and a Scanner for further reads.
 type Node struct {
 	Val     int
 	Fd      *os.File
 	Scanner *bufio.Scanner
 }
 
-// MinHeap Implementation of a min-heap that takes Node's Val */
-type MinHeap []Node
-
+// NewNode opens the given file, reads its first integer, and returns a Node.
+// If any error occurs, it closes the file before returning.
 func NewNode(filename string) (Node, error) {
 	fd, err := os.Open(filename)
 	if err != nil {
-		return Node{}, err
+		return Node{}, fmt.Errorf("open file %s: %w", filename, err)
 	}
+
 	scanner := bufio.NewScanner(fd)
 	scanner.Split(bufio.ScanWords)
-	if scanner.Scan() {
-		val, err := strconv.Atoi(scanner.Text())
-		if err != nil {
-			return Node{}, err
+
+	if !scanner.Scan() {
+		// close on failure to read
+		fd.Close()
+		if scanErr := scanner.Err(); scanErr != nil {
+			return Node{}, fmt.Errorf("scan file %s: %w", filename, scanErr)
 		}
-		return Node{
-			Val:     val,
-			Fd:      fd,
-			Scanner: scanner,
-		}, nil
+		return Node{}, fmt.Errorf("no integer found in file %s", filename)
 	}
-	if err = scanner.Err(); err != nil {
-		return Node{}, err
+
+	val, err := strconv.Atoi(scanner.Text())
+	if err != nil {
+		fd.Close()
+		return Node{}, fmt.Errorf("parse integer in file %s: %w", filename, err)
 	}
-	return Node{}, errors.New("failed to scan the first integer")
+
+	return Node{Val: val, Fd: fd, Scanner: scanner}, nil
 }
 
-func (minHeap *MinHeap) Len() int {
-	return len(*minHeap)
+// MinHeap is a slice of Nodes that implements a min-heap ordered by Node.Val.
+// It is compatible with container/heap.
+type MinHeap []Node
+
+// NewMinHeap returns a pointer to an empty heap with the given initial capacity.
+func NewMinHeap(capacity int) *MinHeap {
+	h := make(MinHeap, 0, capacity)
+	return &h
 }
 
-func (minHeap *MinHeap) Less(i, j int) bool {
-	return (*minHeap)[i].Val < (*minHeap)[j].Val
+// Len returns the number of elements in the heap.
+func (h *MinHeap) Len() int {
+	return len(*h)
 }
 
-func (minHeap *MinHeap) Swap(i, j int) {
-	(*minHeap)[i], (*minHeap)[j] = (*minHeap)[j], (*minHeap)[i]
+// Less reports whether the element at index i is less than the one at j.
+func (h *MinHeap) Less(i, j int) bool {
+	return (*h)[i].Val < (*h)[j].Val
 }
 
-func (minHeap *MinHeap) Push(val interface{}) {
-	*minHeap = append(*minHeap, val.(Node))
+// Swap swaps the elements at indices i and j.
+func (h *MinHeap) Swap(i, j int) {
+	(*h)[i], (*h)[j] = (*h)[j], (*h)[i]
 }
 
-func (minHeap *MinHeap) Pop() interface{} {
-	oldLength := len(*minHeap)
-	val := (*minHeap)[oldLength-1]
-	*minHeap = (*minHeap)[:(oldLength - 1)]
-	return val
+// Push inserts x into the heap. x must be a Node.
+func (h *MinHeap) Push(x any) {
+	*h = append(*h, x.(Node))
 }
 
-func (minHeap *MinHeap) Empty() bool {
-	return len(*minHeap) == 0
+// Pop removes and returns the smallest element from the heap.
+func (h *MinHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
+}
+
+// Empty reports whether the heap contains no elements.
+func (h *MinHeap) Empty() bool {
+	return h.Len() == 0
 }
