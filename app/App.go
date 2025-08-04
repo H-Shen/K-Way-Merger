@@ -6,13 +6,43 @@ package app
 import (
 	myHeap "KWayMerger/heap"
 	"bufio"
-	"container/heap"
 	"fmt"
 	"os"
 	"sort"
 	"strconv"
 	"sync"
 )
+
+// NewNode opens the given file, reads its first integer, and returns a Node[int].
+// If any error occurs, it closes the file before returning.
+// This function maintains compatibility with existing code that uses int values.
+
+func NewNode(filename string) (myHeap.Node[int], error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return myHeap.Node[int]{}, fmt.Errorf("open file %s: %w", filename, err)
+	}
+
+	scanner := bufio.NewScanner(fd)
+	scanner.Split(bufio.ScanWords)
+
+	if !scanner.Scan() {
+		// close on failure to read
+		fd.Close()
+		if scanErr := scanner.Err(); scanErr != nil {
+			return myHeap.Node[int]{}, fmt.Errorf("scan file %s: %w", filename, scanErr)
+		}
+		return myHeap.Node[int]{}, fmt.Errorf("no integer found in file %s", filename)
+	}
+
+	val, err := strconv.Atoi(scanner.Text())
+	if err != nil {
+		fd.Close()
+		return myHeap.Node[int]{}, fmt.Errorf("parse integer in file %s: %w", filename, err)
+	}
+
+	return myHeap.Node[int]{Val: val, Fd: fd, Scanner: scanner}, nil
+}
 
 // readSortRewrite reads integers from a file, sorts them, and rewrites the sorted
 // integers back to the same file. Each integer is read as a separate word.
@@ -114,9 +144,10 @@ func mergeAndWrite(input []string, output string) error {
 		}
 	}()
 
-	// Initialize min-heap
-	var minHeap myHeap.MinHeap
-	heap.Init(&minHeap)
+	// Initialize min-heap with default comparator for int values
+	minHeap := myHeap.NewMinHeap(len(input), func(a, b int) bool {
+		return a < b
+	})
 
 	// Track all open files for proper cleanup
 	var openFiles []*os.File
@@ -128,18 +159,18 @@ func mergeAndWrite(input []string, output string) error {
 	}()
 
 	// Create nodes for each input file and add to heap
-	for i := 0; i < len(input); i++ {
-		node, err := myHeap.NewNode(input[i])
-		if err != nil {
-			return fmt.Errorf("failed to create node for file %s: %w", input[i], err)
+	for i := range input {
+		node, newErr := NewNode(input[i])
+		if newErr != nil {
+			return fmt.Errorf("failed to create node for file %s: %w", input[i], newErr)
 		}
 		openFiles = append(openFiles, node.Fd)
-		heap.Push(&minHeap, node)
+		minHeap.PushNode(node)
 	}
 
 	// Merge process: extract minimum value from heap and write to output
 	for !minHeap.Empty() {
-		node := heap.Pop(&minHeap).(myHeap.Node)
+		node := minHeap.PopNode()
 		// Write the smallest value to output file
 		_, err = fmt.Fprintf(fd, "%v\n", node.Val)
 		if err != nil {
@@ -153,7 +184,7 @@ func mergeAndWrite(input []string, output string) error {
 				return fmt.Errorf("failed to parse number in file %s: %w", node.Fd.Name(), parseErr)
 			}
 			node.Val = val
-			heap.Push(&minHeap, node) // Reinsert node with new value
+			minHeap.PushNode(node) // Reinsert node with new value
 		} else {
 			// File is exhausted, remove from open files list
 			for i, f := range openFiles {
@@ -203,7 +234,7 @@ func Run(input []string, output string) error {
 
 	wg.Add(len(input))
 	// Process each input file in parallel
-	for i := 0; i < len(input); i++ {
+	for i := range input {
 		j := i
 		go func() {
 			defer wg.Done()
