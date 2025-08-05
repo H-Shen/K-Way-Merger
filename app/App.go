@@ -1,60 +1,67 @@
+// Package app provides generic functionality for the K-Way Merger application.
+// It handles reading input files, sorting their contents, and merging them
+// using a min-heap to produce a single sorted output file with support for any type.
 package app
 
-// Package app provides the core functionality for the K-Way Merger application.
-// It handles reading input files, sorting their contents, and merging them
-// using a min-heap to produce a single sorted output file.
 import (
 	myHeap "KWayMerger/heap"
 	"bufio"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
-	"strconv"
 	"sync"
 )
 
-// NewNode opens the given file, reads its first integer, and returns a Node[int].
-// If any error occurs, it closes the file before returning.
-// This function maintains compatibility with existing code that uses int values.
+// ParseFunc defines a function type for parsing a string into type T.
+type ParseFunc[T any] func(string) (T, error)
 
-func NewNode(filename string) (myHeap.Node[int], error) {
+// FormatFunc defines a function type for formatting a value of type T into a string.
+type FormatFunc[T any] func(T) string
+
+// NewNode opens the given file, reads its first value using the provided parser,
+// and returns a Node[T]. If any error occurs, it closes the file before returning.
+func NewNode[T any](filename string, parser ParseFunc[T]) (myHeap.Node[T], error) {
 	fd, err := os.Open(filename)
 	if err != nil {
-		return myHeap.Node[int]{}, fmt.Errorf("open file %s: %w", filename, err)
+		return myHeap.Node[T]{}, fmt.Errorf("open file %s: %w", filename, err)
 	}
 
 	scanner := bufio.NewScanner(fd)
 	scanner.Split(bufio.ScanWords)
 
 	if !scanner.Scan() {
-		// close on failure to read
+		// Close on failure to read
 		fd.Close()
 		if scanErr := scanner.Err(); scanErr != nil {
-			return myHeap.Node[int]{}, fmt.Errorf("scan file %s: %w", filename, scanErr)
+			return myHeap.Node[T]{}, fmt.Errorf("scan file %s: %w", filename, scanErr)
 		}
-		return myHeap.Node[int]{}, fmt.Errorf("no integer found in file %s", filename)
+		return myHeap.Node[T]{}, fmt.Errorf("no value found in file %s", filename)
 	}
 
-	val, err := strconv.Atoi(scanner.Text())
+	val, err := parser(scanner.Text())
 	if err != nil {
 		fd.Close()
-		return myHeap.Node[int]{}, fmt.Errorf("parse integer in file %s: %w", filename, err)
+		return myHeap.Node[T]{}, fmt.Errorf("parse value in file %s: %w", filename, err)
 	}
 
-	return myHeap.Node[int]{Val: val, Fd: fd, Scanner: scanner}, nil
+	return myHeap.Node[T]{Val: val, Fd: fd, Scanner: scanner}, nil
 }
 
-// readSortRewrite reads integers from a file, sorts them, and rewrites the sorted
-// integers back to the same file. Each integer is read as a separate word.
+// readSortRewrite reads values of type T from a file, sorts them using the provided comparator,
+// and rewrites the sorted values back to the same file using the provided formatter.
 //
 // Parameters:
 //
 //	file - The path to the file to be read, sorted, and rewritten
+//	parser - Function to parse string values into type T
+//	formatter - Function to format values of type T into strings
+//	cmp - Comparator function for sorting values of type T
 //
 // Returns:
 //
 //	error - Any error encountered during reading, sorting, or writing
-func readSortRewrite(file string) error {
+func readSortRewrite[T any](file string, parser ParseFunc[T], formatter FormatFunc[T], cmp func(T, T) bool) error {
 	// Open file for reading
 	fd, err := os.Open(file)
 	if err != nil {
@@ -68,24 +75,25 @@ func readSortRewrite(file string) error {
 		}
 	}()
 
-	// Read integers from file
+	// Read values from file
 	scanner := bufio.NewScanner(fd)
 	scanner.Split(bufio.ScanWords) // Split on whitespace
-	var temp int
-	var list []int
+	var list []T
 	for scanner.Scan() {
-		temp, err = strconv.Atoi(scanner.Text())
-		if err != nil {
-			return fmt.Errorf("failed to parse number in file %s: %w", file, err)
+		val, parseErr := parser(scanner.Text())
+		if parseErr != nil {
+			return fmt.Errorf("failed to parse value in file %s: %w", file, parseErr)
 		}
-		list = append(list, temp)
+		list = append(list, val)
 	}
 	if err = scanner.Err(); err != nil {
 		return fmt.Errorf("error reading file %s: %w", file, err)
 	}
 
-	// Sort the integers
-	sort.Ints(list)
+	// Sort the values using the provided comparator
+	sort.Slice(list, func(i, j int) bool {
+		return cmp(list[i], list[j])
+	})
 
 	// Open file for writing (truncate existing content)
 	fd2, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -100,9 +108,9 @@ func readSortRewrite(file string) error {
 		}
 	}()
 
-	// Write sorted integers back to file
+	// Write sorted values back to file
 	for i := 0; i < len(list); i++ {
-		_, err = fmt.Fprintf(fd2, "%v\n", list[i])
+		_, err = fmt.Fprintf(fd2, "%s\n", formatter(list[i]))
 		if err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", file, err)
 		}
@@ -117,37 +125,38 @@ func readSortRewrite(file string) error {
 	return nil
 }
 
-// mergeAndWrite merges integers from multiple sorted input files into a single
+// mergeAndWrite merges values of type T from multiple sorted input files into a single
 // sorted output file using a min-heap. It reads the smallest available value
 // from each input file, adds it to the heap, and then extracts the minimum
 // value to write to the output file.
 //
 // Parameters:
 //
-//	input - Slice of paths to the input files containing sorted integers
-//	output - Path to the output file where merged sorted integers will be written
+//	inputFiles - Slice of paths to the input files containing sorted values
+//	outputFile - Path to the output file where merged sorted values will be written
+//	parser - Function to parse string values into type T
+//	formatter - Function to format values of type T into strings
+//	cmp - Comparator function for ordering values of type T
 //
 // Returns:
 //
 //	error - Any error encountered during merging or writing
-func mergeAndWrite(input []string, output string) error {
+func mergeAndWrite[T any](inputFiles []string, outputFile string, parser ParseFunc[T], formatter FormatFunc[T], cmp func(T, T) bool) error {
 	// Open output file for writing
-	fd, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	fd, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open output file %s: %w", output, err)
+		return fmt.Errorf("failed to open output file %s: %w", outputFile, err)
 	}
 	// Ensure output file is closed when function exits
 	defer func() {
 		closeErr := fd.Close()
 		if closeErr != nil && err == nil {
-			err = fmt.Errorf("failed to close output file %s: %w", output, closeErr)
+			err = fmt.Errorf("failed to close output file %s: %w", outputFile, closeErr)
 		}
 	}()
 
-	// Initialize min-heap with default comparator for int values
-	minHeap := myHeap.NewMinHeap(len(input), func(a, b int) bool {
-		return a < b
-	})
+	// Initialize min-heap with the provided comparator
+	minHeap := myHeap.NewMinHeap(len(inputFiles), cmp)
 
 	// Track all open files for proper cleanup
 	var openFiles []*os.File
@@ -159,10 +168,10 @@ func mergeAndWrite(input []string, output string) error {
 	}()
 
 	// Create nodes for each input file and add to heap
-	for i := range input {
-		node, newErr := NewNode(input[i])
+	for i := range inputFiles {
+		node, newErr := NewNode(inputFiles[i], parser)
 		if newErr != nil {
-			return fmt.Errorf("failed to create node for file %s: %w", input[i], newErr)
+			return fmt.Errorf("failed to create node for file %s: %w", inputFiles[i], newErr)
 		}
 		openFiles = append(openFiles, node.Fd)
 		minHeap.PushNode(node)
@@ -172,16 +181,16 @@ func mergeAndWrite(input []string, output string) error {
 	for !minHeap.Empty() {
 		node := minHeap.PopNode()
 		// Write the smallest value to output file
-		_, err = fmt.Fprintf(fd, "%v\n", node.Val)
+		_, err = fmt.Fprintf(fd, "%s\n", formatter(node.Val))
 		if err != nil {
-			return fmt.Errorf("failed to write to output file %s: %w", output, err)
+			return fmt.Errorf("failed to write to output file %s: %w", outputFile, err)
 		}
 
 		// Read next value from the same file if available
 		if node.Scanner.Scan() {
-			val, parseErr := strconv.Atoi(node.Scanner.Text())
+			val, parseErr := parser(node.Scanner.Text())
 			if parseErr != nil {
-				return fmt.Errorf("failed to parse number in file %s: %w", node.Fd.Name(), parseErr)
+				return fmt.Errorf("failed to parse value in file %s: %w", node.Fd.Name(), parseErr)
 			}
 			node.Val = val
 			minHeap.PushNode(node) // Reinsert node with new value
@@ -199,71 +208,76 @@ func mergeAndWrite(input []string, output string) error {
 			if closeErr != nil {
 				return fmt.Errorf("failed to close file: %w", closeErr)
 			}
-
-			// Check for scanner errors
-			if scanErr := node.Scanner.Err(); scanErr != nil {
-				return fmt.Errorf("error reading file: %w", scanErr)
-			}
 		}
 	}
 
 	// Sync output file to ensure data is written to disk
 	err = fd.Sync()
 	if err != nil {
-		return fmt.Errorf("failed to sync output file %s: %w", output, err)
+		return fmt.Errorf("failed to sync output file %s: %w", outputFile, err)
 	}
 
 	return nil
 }
 
-// Run executes the K-Way Merger application. It processes input files in parallel,
-// sorting each file, then merges the sorted files into a single output file.
+// Run is the generic entry point for the K-Way Merger application.
+// It sorts each input file individually using the provided parser, formatter, and comparator,
+// then merges them into a single sorted output file.
 //
 // Parameters:
 //
-//	input - Slice of paths to the input files containing integers
-//	output - Path to the output file where merged sorted integers will be written
+//	inputFiles - Slice of paths to the input files containing unsorted values
+//	outputFile - Path to the output file where merged sorted values will be written
+//	parser - Function to parse string values into type T
+//	formatter - Function to format values of type T into strings
+//	cmp - Comparator function for ordering values of type T
+//	concurrency - Number of concurrent goroutines to use for sorting
 //
 // Returns:
 //
-//	error - Any error encountered during processing or merging
-func Run(input []string, output string) error {
-	// Channel to collect errors from goroutines
-	errCh := make(chan error, len(input))
+//	error - Any error encountered during the process
+func Run[T any](inputFiles []string, outputFile string, parser ParseFunc[T], formatter FormatFunc[T], cmp func(T, T) bool) error {
+	// Limit concurrency to number of input files if necessary
+	// Get the number of CPU cores for concurrency, limit concurrency to number of input files if necessary
+	concurrency := runtime.NumCPU()
+	if concurrency > len(inputFiles) {
+		concurrency = len(inputFiles)
+	}
+
+	// Create a semaphore to control concurrency
+	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
+	var errMu sync.Mutex
+	var firstErr error
 
-	wg.Add(len(input))
-	// Process each input file in parallel
-	for i := range input {
-		j := i
-		go func() {
+	// Sort each input file in parallel
+	for _, file := range inputFiles {
+		sem <- struct{}{} // Acquire semaphore
+		wg.Add(1)
+		go func(file string) {
 			defer wg.Done()
-			// Read, sort, and rewrite each file
-			if err := readSortRewrite(input[j]); err != nil {
-				errCh <- fmt.Errorf("error processing file %s: %w", input[j], err)
+			defer func() { <-sem }() // Release semaphore
+
+			if err := readSortRewrite(file, parser, formatter, cmp); err != nil {
+				errMu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				errMu.Unlock()
 			}
-		}()
+		}(file)
 	}
 
-	// Close error channel once all goroutines are done
-	go func() {
-		wg.Wait()
-		close(errCh)
-	}()
+	// Wait for all sorting goroutines to complete
+	wg.Wait()
 
-	// Collect all errors from goroutines
-	var errs []error
-	for err := range errCh {
-		errs = append(errs, err)
+	// Check if any sorting operation failed
+	if firstErr != nil {
+		return fmt.Errorf("failed to sort input files: %w", firstErr)
 	}
 
-	// If there are errors from any goroutine, return them
-	if len(errs) > 0 {
-		return fmt.Errorf("%d errors occurred during processing: %v", len(errs), errs)
-	}
-
-	// Merge the sorted files into the output file
-	if err := mergeAndWrite(input, output); err != nil {
+	// Merge the sorted files
+	if err := mergeAndWrite(inputFiles, outputFile, parser, formatter, cmp); err != nil {
 		return fmt.Errorf("failed to merge files: %w", err)
 	}
 
