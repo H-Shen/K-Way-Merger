@@ -1,42 +1,74 @@
-### K-Way Merger
+# K-Way Merger
 
-A Go implementation of the K-way merge algorithm for efficiently merging multiple sorted files into a single sorted output file. This implementation uses a min-heap to achieve optimal performance.
+A Go implementation of the K-way merge algorithm as a reusable library for efficiently merging multiple sorted files into a single sorted output file. This implementation uses a generic heap data structure to achieve optimal performance.
 
 ## Overview
 
-The K-Way Merger application:
+The K-Way Merger library provides functionality to:
 
-1. Reads multiple input files containing integers
-2. Sorts each input file in parallel using goroutines
-3. Merges the sorted files into a single output file using a min-heap
-4. Handles errors gracefully throughout the process
+1. Read multiple input files containing sorted data
+2. Merge the sorted files into a single output file using a min-heap
+3. Support for different data types (int32, int64, string)
+4. Customizable parsing and formatting of data
+5. Error handling throughout the process
 
-This implementation is particularly useful for scenarios where you need to sort very large datasets that don't fit into memory (external sorting), by splitting the data into smaller chunks, sorting each chunk, and then merging them.
+This library is particularly useful for scenarios where you need to merge sorted data from multiple sources, such as in external sorting for large datasets that don't fit into memory.
 
 ## Architecture
 
-The application consists of the following main components:
+The library consists of the following main components:
 
 1. **app package**: Contains the core logic for reading, sorting, and merging files
-   - `readSortRewrite`: Reads a file, sorts its integers, and rewrites the sorted data
+   - `ParseFunc` and `FormatFunc`: Function types for custom data parsing and formatting
+   - `readSortRewrite`: Reads a file, sorts its data, and rewrites the sorted data
    - `mergeAndWrite`: Merges multiple sorted files into one using a min-heap
-   - `Run`: Orchestrates the parallel sorting and merging process
+   - `Run`: Orchestrates the sorting and merging process
 
-2. **heap package**: Implements a min-heap data structure for efficient merging
+2. **heap package**: Implements a generic heap data structure for efficient merging
    - `Node`: Represents a file and its current value
-   - `MinHeap`: Implements the min-heap interface for sorting nodes by value
+   - `Heap`: Implements the heap interface for sorting nodes by value based on a custom comparator
+   - Generic implementation supporting different data types
 
-3. **main.go**: Entry point that parses command-line arguments and invokes the core logic
+3. **main.go**: Example application demonstrating library usage
 
 ## Usage
 
-### Command Line
+### As a Library
 
-To use the K-Way Merger, run:
+To use the K-Way Merger in your Go project, import the package and use its API:
+
+```go
+import (
+    "github.com/yourusername/kwaymerger/app"
+    "github.com/yourusername/kwaymerger/heap"
+)
+
+func main() {
+    // Define input and output files
+    inputFiles := []string{"input1.txt", "input2.txt", "input3.txt"}
+    outputFile := "output.txt"
+
+    // For int32 data
+    err := app.Run[int32](inputFiles, outputFile, app.ParseInt32, app.FormatInt32)
+    if err != nil {
+        log.Fatalf("Error running K-Way Merger: %v", err)
+    }
+
+    // For string data
+    err = app.Run[string](inputFiles, outputFile, app.ParseString, app.FormatString)
+    if err != nil {
+        log.Fatalf("Error running K-Way Merger: %v", err)
+    }
+}
+```
+
+### Example Application
+
+The repository includes an example application that demonstrates library usage:
 
 ```shell
-# Build the application
-go build -o kwaymerger
+# Build the example application
+go build -o kwaymerger main.go
 
 # Run with input files and output file
 ./kwaymerger [file1 file2 ... fileN] [outputFile]
@@ -50,7 +82,7 @@ Example:
 
 ### Docker
 
-To build and run using Docker:
+To build and run the example application using Docker:
 
 ```shell
 # Build the Docker image
@@ -74,9 +106,9 @@ To run the unit tests:
 
 ## Performance Considerations
 
-- The algorithm efficiently merges K sorted files with a time complexity of O(N log K), where N is the total number of elements
-- Parallel sorting of input files improves performance on multi-core systems
-- Memory usage is optimized by processing files sequentially and using a heap of size K
+- The algorithm efficiently merges K sorted files using a generic heap with a time complexity of O(N log K), where N is the total number of elements
+- Memory usage is optimized by processing files sequentially and using a generic heap of size K
+- Generic implementation allows for type-safe usage with different data types
 
 ## Requirements
 

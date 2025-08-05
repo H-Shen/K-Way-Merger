@@ -21,10 +21,10 @@ type Node[T any] struct {
 	Scanner *bufio.Scanner
 }
 
-// MinHeap is a generic min-heap that holds Node[T] elements
+// Heap is a generic heap that holds Node[T] elements according to the provided comparator
 // and uses a comparator function to order them.
 
-type MinHeap[T any] struct {
+type Heap[T any] struct {
 	nodes      []Node[T]
 	comparator Comparator[T]
 }
@@ -59,11 +59,11 @@ func NewNode[T any](filename string, parser func(string) (T, error)) (Node[T], e
 	return Node[T]{Val: val, Fd: fd, Scanner: scanner}, nil
 }
 
-// NewMinHeap creates a new min-heap with the given initial capacity and comparator.
+// NewHeap creates a new heap with the given initial capacity and comparator.
 // Use this function to create heaps with custom value types and comparison logic.
 
-func NewMinHeap[T any](capacity int, comparator Comparator[T]) *MinHeap[T] {
-	h := &MinHeap[T]{
+func NewHeap[T any](capacity int, comparator Comparator[T]) *Heap[T] {
+	h := &Heap[T]{
 		nodes:      make([]Node[T], 0, capacity),
 		comparator: comparator,
 	}
@@ -73,32 +73,32 @@ func NewMinHeap[T any](capacity int, comparator Comparator[T]) *MinHeap[T] {
 
 // Len returns the number of elements in the heap.
 
-func (h *MinHeap[T]) Len() int {
+func (h *Heap[T]) Len() int {
 	return len(h.nodes)
 }
 
 // Less reports whether the element at index i is less than the one at j
 // using the heap's comparator function.
 
-func (h *MinHeap[T]) Less(i, j int) bool {
+func (h *Heap[T]) Less(i, j int) bool {
 	return h.comparator(h.nodes[i].Val, h.nodes[j].Val)
 }
 
 // Swap swaps the elements at indices i and j.
 
-func (h *MinHeap[T]) Swap(i, j int) {
+func (h *Heap[T]) Swap(i, j int) {
 	h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i]
 }
 
 // Push inserts x into the heap. x must be a Node[T].
 
-func (h *MinHeap[T]) Push(x any) {
+func (h *Heap[T]) Push(x any) {
 	h.nodes = append(h.nodes, x.(Node[T]))
 }
 
 // Pop removes and returns the smallest element from the heap.
 
-func (h *MinHeap[T]) Pop() any {
+func (h *Heap[T]) Pop() any {
 	old := h.nodes
 	n := len(old)
 	x := old[n-1]
@@ -108,18 +108,18 @@ func (h *MinHeap[T]) Pop() any {
 
 // Empty reports whether the heap contains no elements.
 
-func (h *MinHeap[T]) Empty() bool {
+func (h *Heap[T]) Empty() bool {
 	return h.Len() == 0
 }
 
 // Helper method to push a Node[T] into the heap
 
-func (h *MinHeap[T]) PushNode(node Node[T]) {
+func (h *Heap[T]) PushNode(node Node[T]) {
 	heap.Push(h, node)
 }
 
-// Helper method to pop the smallest Node[T] from the heap
+// Helper method to pop the top Node[T] from the heap according to the comparator
 
-func (h *MinHeap[T]) PopNode() Node[T] {
+func (h *Heap[T]) PopNode() Node[T] {
 	return heap.Pop(h).(Node[T])
 }

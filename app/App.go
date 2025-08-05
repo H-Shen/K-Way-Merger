@@ -156,7 +156,7 @@ func mergeAndWrite[T any](inputFiles []string, outputFile string, parser ParseFu
 	}()
 
 	// Initialize min-heap with the provided comparator
-	minHeap := myHeap.NewMinHeap(len(inputFiles), cmp)
+	minHeap := myHeap.NewHeap(len(inputFiles), cmp)
 
 	// Track all open files for proper cleanup
 	var openFiles []*os.File
