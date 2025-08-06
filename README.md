@@ -38,21 +38,41 @@ The library consists of the following main components:
 To use the K-Way Merger in your Go project, import the package and use its API:
 
 ```go
+package main
+
 import (
-    "github.com/yourusername/kwaymerger/app"
-    "github.com/yourusername/kwaymerger/heap"
+	"github.com/yourusername/kwaymerger/app"
+	"github.com/yourusername/kwaymerger/heap"
 )
 
-func main() {
-    // Define input and output files
-    inputFiles := []string{"input1.txt", "input2.txt", "input3.txt"}
-    outputFile := "output.txt"
+// parseInt32 parses a string into an int32.
+func parseInt32(s string) (int32, error) {
+	val, err := strconv.ParseInt(s, 10, 32)
+	return int32(val), err
+}
 
-    // For int32 data
-    err := app.Run[int32](inputFiles, outputFile, app.ParseInt32, app.FormatInt32)
-    if err != nil {
-        log.Fatalf("Error running K-Way Merger: %v", err)
-    }
+// formatInt32 formats an int32 into a string.
+func formatInt32(i int32) string {
+	return strconv.FormatInt(int64(i), 10)
+}
+
+// compareInt32 compares two int32 values in ascending order.
+func compareInt32(a, b int32) bool {
+	return a < b
+}
+
+func main() {
+	// Define input and output files
+	inputFiles := []string{"input1.txt", "input2.txt", "input3.txt"}
+	outputFile := "output.txt"
+
+	// Run the K-Way Merger for int32 data
+	fmt.Println("Merging files...")
+	err := app.Run[int32](inputFiles, outputFile, parseInt32, formatInt32)
+	if err != nil {
+		log.Fatalf("Error running K-Way Merger: %v", err)
+	}
+	fmt.Printf("Successfully merged %v files into %v\n", len(inputFiles), outputFile)
 }
 ```
 
