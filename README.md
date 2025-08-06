@@ -41,8 +41,10 @@ To use the K-Way Merger in your Go project, import the package and use its API:
 package main
 
 import (
-	"github.com/yourusername/kwaymerger/app"
-	"github.com/yourusername/kwaymerger/heap"
+	"KWayMerger/app"
+	"fmt"
+	"log"
+	"strconv"
 )
 
 // parseInt32 parses a string into an int32.
@@ -68,7 +70,7 @@ func main() {
 
 	// Run the K-Way Merger for int32 data
 	fmt.Println("Merging files...")
-	err := app.Run[int32](inputFiles, outputFile, parseInt32, formatInt32)
+	err := app.Run[int32](inputFiles, outputFile, parseInt32, formatInt32, compareInt32)
 	if err != nil {
 		log.Fatalf("Error running K-Way Merger: %v", err)
 	}
