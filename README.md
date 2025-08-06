@@ -53,12 +53,6 @@ func main() {
     if err != nil {
         log.Fatalf("Error running K-Way Merger: %v", err)
     }
-
-    // For string data
-    err = app.Run[string](inputFiles, outputFile, app.ParseString, app.FormatString)
-    if err != nil {
-        log.Fatalf("Error running K-Way Merger: %v", err)
-    }
 }
 ```
 
